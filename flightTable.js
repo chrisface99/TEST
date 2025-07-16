@@ -4,7 +4,6 @@ import {
   isUpcomingFlight,
   sortFlightsByTime,
   generateRandomGate,
-  getRandomFlightStatus,
 } from "./utils.js";
 import FlightService from "./flightService.js";
 
@@ -21,10 +20,33 @@ class FlightTableManager {
     this.rowsCount = count;
   }
 
+  async saveLogsToFile(logData) {
+  if ('showSaveFilePicker' in window) {
+    try {
+      const options = {
+        suggestedName: 'flight-log.txt',
+        types: [{
+          description: 'Text Files',
+          accept: { 'text/plain': ['.txt'] }
+        }]
+      };
+      const handle = await window.showSaveFilePicker(options);
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(logData, null, 2));
+      await writable.close();
+      alert('Log saved successfully!');
+    } catch (err) {
+      console.error('Error saving log file:', err);
+    }
+  } else {
+    alert('File System Access API not supported in this browser.');
+  }
+}
+
   async updateDepartureTable(flights) {
     const currentTime = new Date();
     let upcomingFlights = flights.filter((flight) =>
-      isUpcomingFlight(flight.departure.scheduled)
+      isUpcomingFlight(flight.departure.scheduledTime)
     );
 
     if (upcomingFlights.length === 0) {
@@ -40,36 +62,49 @@ class FlightTableManager {
     for (const flight of upcomingFlights) {
       if (uniqueFlights.length >= this.rowsCount) break;
 
-      const flightTime = formatFlightTime(flight.departure.scheduled);
-      const iataCode = flight.arrival.iata || "Unknown";
+      const flightTime = formatFlightTime(flight.departure.scheduledTime);
+
+      const iataCode =
+        flight.arrival && flight.arrival.iataCode
+          ? flight.arrival.iataCode
+          : "Unknown";
       const destinationCity = getCityNameFromIATA(iataCode);
-      const airlineCode = flight.flight.iata.slice(0, 2);
+
+      const airlineCode =
+        flight.airline && flight.airline.iataCode
+          ? flight.airline.iataCode
+          : "XX";
       const airlineIcon = await this.flightService.fetchAirlineIcon(
         airlineCode
       );
 
       if (flight.departure.gate) {
         this.gateCache[flight.flight.iata] = flight.departure.gate;
-      } else if (!this.gateCache[flight.flight.iata]) {
-        this.gateCache[flight.flight.iata] = generateRandomGate();
+      } else {
+        this.gateCache[flight.flight.iata] = null;
       }
 
-      const gate = this.gateCache[flight.flight.iata];
-
-      const status = flight.status || "N/A";
-      const statusClass = `status-${status.toLowerCase()}`;
+      let gate = this.gateCache[flight.flight.iata];
+      if (gate === null || gate === undefined) {
+        gate = "Soon";
+      }
+      let status = flight.status || "N/A";
+      if (flight.departure.delay) {
+        status += ` (+${flight.departure.delay} min)`;
+      }
+      const statusClass = status.toLowerCase().replace(/\s/g, "-");
 
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td>${flightTime}</td>
-        <td>${destinationCity} (${iataCode})</td>
-        <td>
-          <img src="${airlineIcon}" alt="${airlineCode}" class="airline-icon">
-          ${flight.flight.iata || "N/A"}
-        </td>
-        <td>${gate}</td>
-        <td class="${statusClass}">${status}</td>
-      `;
+    <td>${flightTime}</td>
+    <td>${destinationCity} (${iataCode})</td>
+    <td>
+      <img src="${airlineIcon}" alt="${airlineCode}" class="airline-icon">
+      ${flight.flight.iata || flight.flight.iataNumber || "N/A"}
+    </td>
+    <td>${gate}</td>
+    <td class="${statusClass}">${status}</td>
+  `;
 
       this.departureTableBody.appendChild(row);
       uniqueFlights.push(flight);
@@ -80,7 +115,7 @@ class FlightTableManager {
 
   async updateArrivalTable(flights) {
     let upcomingFlights = flights.filter((flight) =>
-      isUpcomingFlight(flight.arrival.scheduled, true)
+      isUpcomingFlight(flight.arrival.scheduledTime, true)
     );
 
     if (upcomingFlights.length === 0) {
@@ -94,8 +129,9 @@ class FlightTableManager {
     for (const flight of upcomingFlights) {
       if (uniqueFlights.length >= this.rowsCount) break;
 
-      const flightTime = formatFlightTime(flight.arrival.scheduled);
-      const iataCode = flight.arrival.iata || "Unknown";
+      const flightTime = formatFlightTime(flight.arrival.scheduledTime);
+      const iataCode =
+        flight.arrival.iata || flight.arrival.iataCode || "Unknown";
       const departureCity = getCityNameFromIATA(iataCode);
       const airlineCode = flight.flight.iata
         ? flight.flight.iata.slice(0, 2)
@@ -111,9 +147,8 @@ class FlightTableManager {
       }
 
       const gate = this.gateCache[flight.flight.iata];
-
       const status = flight.status || "N/A";
-      const statusClass = `status-${status.toLowerCase()}`;
+      const statusClass = status.toLowerCase().replace(/\s/g, "-");
 
       const row = document.createElement("tr");
       row.innerHTML = `
@@ -121,7 +156,7 @@ class FlightTableManager {
         <td>${departureCity} (${iataCode})</td>
         <td>
           <img src="${airlineIcon}" alt="${airlineCode}" class="airline-icon">
-          ${flight.flight.iata || "N/A"}
+          ${flight.flight.iata || flight.flight.iataNumber || "N/A"}
         </td>
         <td>${gate}</td>
         <td class="${statusClass}">${status}</td>
@@ -133,24 +168,16 @@ class FlightTableManager {
     }
   }
 
-  async updateTableDisplay(
-    iataCodeCity = "WAW",
-    template = "flightScheduleMain"
-  ) {
-    let type = "departure";
-    if (template === "flightScheduleArrivals") type = "arrival";
-    // For "flightScheduleMain", you may want to fetch both types separately
+  async updateTableDisplay() {
+    const allFlights = await this.flightService.fetchFlights();
+    console.log("Fetched flight data:", allFlights);
+  await this.saveLogsToFile(allFlights);
 
-    const allFlights = await this.flightService.fetchFlights(
-      iataCodeCity,
-      type
+    const departures = allFlights.filter(
+      (f) => f.departure && f.departure.scheduledTime
     );
 
-    if (type === "departure") {
-      await this.updateDepartureTable(allFlights);
-    } else {
-      await this.updateArrivalTable(allFlights);
-    }
+    await this.updateDepartureTable(departures);
   }
 }
 
