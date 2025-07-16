@@ -1,13 +1,13 @@
 export const CONFIG = {
   FILE_URL:
     "https://canvas.samsungvx.com/organizations/23599CF5-F41D-471A-97F1-6F3872F2A44C/partners/D3B51B78-81FA-4A0F-834A-2AE311ECCDD4/widget/flights.json",
-  OPENWEATHER_API_KEY: "d34469173c876dc3e734f40f63a5aa5c",
+  OPENWEATHER_API_KEY: "",
   OPENWEATHER_URL:
     "https://api.openweathermap.org/data/2.5/weather?units=metric&lang=pl&q=",
   // ARRIVAL_FILE_URL: "https://canvas.samsungvx.com/organizations/23599CF5-F41D-471A-97F1-6F3872F2A44C/partners/F4A4F3BE-182C-4A0F-AEFB-A9A3F66E62E6/widget/flights.json",
   AIRLINE_ICON_BASE_URL:
     "https://canvas.samsungvx.com/organizations/23599CF5-F41D-471A-97F1-6F3872F2A44C/partners/D3B51B78-81FA-4A0F-834A-2AE311ECCDD4/widget/icons/",
-  AVIATIONSTACK_API_KEY: "672e46b6f7085eeec91f671df39a7467", // <-- Add this line
+  AVIATIONSTACK_API_KEY: "", // <-- Add this line
   AVIATIONSTACK_BASE_URL: "https://api.aviationstack.com/v1/timetable",
   WEATHER_CACHE_TTL: 3600000,
   DATA_REFRESH_INTERVAL: 120000,  
